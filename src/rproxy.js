@@ -203,16 +203,17 @@ async function handleHttp(req, res) {
 	const url = new URL(req.url, "http://localhost");
 	const path = url.pathname;
 
-	if (path === "/" || path === "") {
-		res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-		res.end(LANDING_HTML);
-		return;
-	}
-
-	// Universal entry: set the active host cookie, redirect to the clean path.
-	if (path === "/go") {
-		let u = (url.searchParams.get("url") || "").trim();
-		if (u && !/^[a-z]+:\/\//i.test(u)) u = "https://" + u;
+	// Universal entry. `/?url=<url>` or `/go?url=<url>` set the active host
+	// cookie and redirect to the clean path. Bare `/` shows the landing page.
+	if (path === "/" || path === "" || path === "/go") {
+		const raw = url.searchParams.get("url");
+		if (!raw) {
+			res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+			res.end(LANDING_HTML);
+			return;
+		}
+		let u = raw.trim();
+		if (!/^[a-z]+:\/\//i.test(u)) u = "https://" + u;
 		try {
 			const t = new URL(u);
 			res.writeHead(302, {
