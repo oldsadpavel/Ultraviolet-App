@@ -5,3 +5,4 @@ node_modules
 shot*.png
 tlstest.cjs
 wstest.cjs
+*.cjs

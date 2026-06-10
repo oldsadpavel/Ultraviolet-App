@@ -334,16 +334,16 @@ async function handleHttp(req, res) {
 	if (isText) {
 		let text = await upstream.text();
 		const ourHost = req.headers.host || "";
-		// CRITICAL: swap the canonical proxied host -> our host. The DeepL app
-		// (and similar SPAs) compares location.hostname to a hardcoded canonical
-		// host string and redirects off-proxy if it differs. By rewriting that
-		// string to OUR host, the check passes and the canonical-host redirect
-		// never fires. Pure hostname-for-hostname swap = no structural breakage.
-		// Cross-subdomain hosts are left intact (client hook routes them via /__h/).
-		if (pageHost && ourHost && pageHost !== ourHost) {
+		// CRITICAL: swap the canonical proxied host -> our host so the app's
+		// location.hostname === "<canonical>" check passes (no off-proxy
+		// redirect). Done ONLY in JS/JSON — NOT in HTML, because HTML carries
+		// Next.js RSC flight rows with byte-length prefixes (`T<len>,...`) that a
+		// length-changing swap would corrupt (empty render). The canonical-host
+		// check lives in a JS chunk, so swapping JS is enough.
+		if (!isHtml && pageHost && ourHost && pageHost !== ourHost) {
 			text = text.split(pageHost).join(ourHost);
 		}
-		// Inject the hook AFTER the swap so its PHOST literal keeps the real host
+		// Inject the hook AFTER any swap so its PHOST literal keeps the real host
 		// (needed for the correct WebSocket Origin via __po).
 		if (isHtml) text = injectHook(text, host);
 		const buf = Buffer.from(text, "utf8");
