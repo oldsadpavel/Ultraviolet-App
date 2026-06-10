@@ -166,7 +166,12 @@ function clientHook(pHost) {
 
 function injectHook(html, pHost) {
 	const meta = `<meta name="referrer" content="unsafe-url">`;
-	const hook = meta + clientHook(pHost);
+	// Hide the DeepL cookie-consent banner (its close button doesn't work
+	// through the proxy). CSS hides it; a tiny observer removes it if React
+	// re-renders it.
+	const style = `<style>[data-testid="dl-cookieBanner"]{display:none!important}</style>`;
+	const killBanner = `<script>(function(){function k(){document.querySelectorAll('[data-testid="dl-cookieBanner"]').forEach(function(e){e.remove();});}try{new MutationObserver(k).observe(document.documentElement,{childList:true,subtree:true});}catch(e){}document.addEventListener("DOMContentLoaded",k);})();</script>`;
+	const hook = meta + style + clientHook(pHost) + killBanner;
 	if (/<head[^>]*>/i.test(html)) {
 		return html.replace(/<head[^>]*>/i, (m) => m + hook);
 	}
