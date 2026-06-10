@@ -1,1 +1,7 @@
 node_modules
+.idea/
+# runtime / test artifacts
+*.log
+shot*.png
+tlstest.cjs
+wstest.cjs

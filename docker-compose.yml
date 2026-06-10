@@ -1,12 +1,15 @@
 services:
-  ultraviolet:
-    ports:
-      - 8080:8080
+  rproxy:
     build:
       context: .
-    container_name: ultraviolet
+    container_name: rproxy
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+    ports:
+      - 8080:8080
     restart: unless-stopped
 
 networks:
   default:
-    name: ultraviolet
+    name: rproxy

@@ -1,25 +1,24 @@
-FROM node:lts-alpine
+FROM node:24-alpine
 
-LABEL maintainer="TitaniumNetwork Ultraviolet Team"
-LABEL summary="Ultraviolet Proxy Image"
-LABEL description="Example application of Ultraviolet which can be deployed in production."
+LABEL summary="Server-side reverse proxy (rproxy) — universal HTTP + WebSocket proxy"
 
 ENV NODE_ENV=production
-WORKDIR /app
+# Coolify routes its assigned domain (with Let's Encrypt HTTPS) to this port.
+ENV PORT=8080
 
-RUN apk add --upgrade --no-cache python3 make g++
+WORKDIR /app
 
 RUN npm install --global corepack@latest
 
-COPY package.json /app/package.json
-COPY pnpm-lock.yaml /app/pnpm-lock.yaml
-
-RUN corepack install
-RUN pnpm install
+COPY package.json pnpm-lock.yaml ./
+RUN corepack enable && corepack install
+# Only production deps (skips playwright/eslint/prettier devDependencies).
+RUN pnpm install --prod --frozen-lockfile
 
 COPY . /app
 
 EXPOSE 8080
 
-ENTRYPOINT [ "node" ]
-CMD ["src/index.js"]
+# Server-side reverse proxy. To run the original Ultraviolet app instead,
+# override the command with: node src/index.js
+CMD ["node", "src/rproxy.js"]
