@@ -116,8 +116,8 @@ function clientHook(pHost) {
       if(!u || u.startsWith("data:") || u.startsWith("blob:") || u.startsWith("javascript:") || u.startsWith("#") || u.startsWith("mailto:") || u.startsWith("tel:")) return u;
       if(u.startsWith(ORIGIN+"/__h/") || u.startsWith(ORIGIN+"/__w/") || u.startsWith("/__h/") || u.startsWith("/__w/")) return u;
       if(/^wss?:\\/\\//i.test(u)){ var w=new URL(u); var s=location.protocol==="https:"?"wss:":"ws:"; var b=s+"//"+location.host+"/__w/"+w.host+w.pathname+w.search; return b+(w.search?"&":"?")+"__po="+encodeURIComponent("https://"+PHOST); }
-      if(/^https?:\\/\\//i.test(u)){ var x=new URL(u); if(x.host===PHOST) return x.pathname+x.search+x.hash; return ORIGIN+"/__h/"+x.host+x.pathname+x.search+x.hash; }
-      if(u.startsWith("//")){ var p=new URL(location.protocol+u); if(p.host===PHOST) return p.pathname+p.search+p.hash; return ORIGIN+"/__h/"+p.host+p.pathname+p.search+p.hash; }
+      if(/^https?:\\/\\//i.test(u)){ var x=new URL(u); if(x.host===location.host||x.host===PHOST) return x.pathname+x.search+x.hash; return ORIGIN+"/__h/"+x.host+x.pathname+x.search+x.hash; }
+      if(u.startsWith("//")){ var p=new URL(location.protocol+u); if(p.host===location.host||p.host===PHOST) return p.pathname+p.search+p.hash; return ORIGIN+"/__h/"+p.host+p.pathname+p.search+p.hash; }
       return u; // root-relative or relative: kept; resolves to ORIGIN -> __phost host
     }catch(e){ return u; }
   }
@@ -325,18 +325,27 @@ async function handleHttp(req, res) {
 	}
 
 	const ctype = upstream.headers.get("content-type") || "";
-	if (HTML_TYPE.test(ctype)) {
+	const isHtml = HTML_TYPE.test(ctype);
+	const isText =
+		isHtml ||
+		/text\/css|javascript|application\/json|application\/manifest|text\/plain/i.test(
+			ctype
+		);
+	if (isText) {
 		let text = await upstream.text();
-		text = injectHook(text, host);
-		const buf = Buffer.from(text, "utf8");
-		outHeaders["content-length"] = String(buf.length);
-		res.writeHead(upstream.status, outHeaders);
-		res.end(buf);
-		return;
-	}
-	if (CSS_TYPE.test(ctype)) {
-		const selfOrigin = "http://" + (req.headers.host || "localhost:8081");
-		const text = rewriteCss(await upstream.text(), selfOrigin);
+		const ourHost = req.headers.host || "";
+		// CRITICAL: swap the canonical proxied host -> our host. The DeepL app
+		// (and similar SPAs) compares location.hostname to a hardcoded canonical
+		// host string and redirects off-proxy if it differs. By rewriting that
+		// string to OUR host, the check passes and the canonical-host redirect
+		// never fires. Pure hostname-for-hostname swap = no structural breakage.
+		// Cross-subdomain hosts are left intact (client hook routes them via /__h/).
+		if (pageHost && ourHost && pageHost !== ourHost) {
+			text = text.split(pageHost).join(ourHost);
+		}
+		// Inject the hook AFTER the swap so its PHOST literal keeps the real host
+		// (needed for the correct WebSocket Origin via __po).
+		if (isHtml) text = injectHook(text, host);
 		const buf = Buffer.from(text, "utf8");
 		outHeaders["content-length"] = String(buf.length);
 		res.writeHead(upstream.status, outHeaders);
